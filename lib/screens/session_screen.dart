@@ -422,6 +422,25 @@ class _SessionScreenState extends State<SessionScreen> {
                           letterSpacing: 0.3,
                         ),
                       ),
+                      if (_session.connectionState == 'connected') ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '•',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 10),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _session.duration,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -514,6 +533,17 @@ class _SessionScreenState extends State<SessionScreen> {
                   ),
                   const SizedBox(width: 8),
 
+                  // Interrupt button (only visible when agent is speaking)
+                  if (_session.agentState == 'speaking') ...[
+                    _buildDockButton(
+                      icon: Icons.stop_rounded,
+                      isActive: true,
+                      color: const Color(0xFFFFD166), // Warning yellow/orange
+                      onTap: _session.interrupt,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
                   // End call button
                   _buildDockButton(
                     icon: Icons.call_end_rounded,
@@ -548,37 +578,45 @@ class _SessionScreenState extends State<SessionScreen> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isActive || isDestructive
-              ? color.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.05),
-          border: Border.all(
-            color: isActive || isDestructive
-                ? color.withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.1),
+    final bgColor = isActive || isDestructive
+        ? color.withValues(alpha: 0.2)
+        : Colors.white.withValues(alpha: 0.05);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(26),
+        splashColor: color.withValues(alpha: 0.3),
+        highlightColor: color.withValues(alpha: 0.1),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: bgColor,
+            border: Border.all(
+              color: isActive || isDestructive
+                  ? color.withValues(alpha: 0.4)
+                  : Colors.white.withValues(alpha: 0.1),
+            ),
+            boxShadow: isActive || isDestructive
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                    ),
+                  ]
+                : null,
           ),
-          boxShadow: isActive || isDestructive
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                  ),
-                ]
-              : null,
-        ),
-        child: Icon(
-          icon,
-          size: 22,
-          color: isActive || isDestructive
-              ? color
-              : Colors.white.withValues(alpha: 0.4),
+          child: Icon(
+            icon,
+            size: 22,
+            color: isActive || isDestructive
+                ? color
+                : Colors.white.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );

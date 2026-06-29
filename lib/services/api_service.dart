@@ -19,7 +19,7 @@ class ApiError implements Exception {
 
 /// REST API client for the soulchat-ai gateway.
 ///
-/// Mirrors the Vue `api.js` surface. Auth is handled via `X-API-Key` and
+/// Auth is handled via `X-API-Key` and
 /// `X-External-User-ID` headers.
 class ApiService {
   final String baseUrl;
@@ -125,7 +125,7 @@ class ApiService {
   /// Sessions end automatically when the LiveKit room closes.
   /// Kept for API compatibility.
   Future<void> endSession(String sessionId) async {
-    // No-op — mirrors Vue SDK behaviour.
+    // No-op — sessions auto-close when the LiveKit room is vacated.
   }
 
   /// Get list of available personas/characters.

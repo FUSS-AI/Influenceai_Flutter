@@ -1,6 +1,6 @@
 /// Data model for a single transcript message.
 ///
-/// Mirrors the JavaScript transcript entries used in the Vue client.
+/// Represents a single transcript message in a voice session.
 class TranscriptEntry {
   /// Unique identifier for this transcript segment.
   final String id;

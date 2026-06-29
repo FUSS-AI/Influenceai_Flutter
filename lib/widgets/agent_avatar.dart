@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// Animated avatar widget with pulsing rings based on agent state.
+/// Animated avatar widget with layered glowing aura based on agent state.
 ///
-/// Mirrors the avatar section of the Vue `SessionRoom.vue` template.
+/// Enhanced design with multi-ring glow effects, gradient overlays,
+/// and smooth state transitions for a premium feel.
 class AgentAvatar extends StatefulWidget {
   /// Current agent state: `idle`, `listening`, `thinking`, `speaking`, `blocked`.
   final String agentState;
@@ -32,28 +34,39 @@ class _AgentAvatarState extends State<AgentAvatar>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _ringController;
+  late AnimationController _glowController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _ringAnimation;
+  late Animation<double> _glowAnimation;
 
   @override
   void initState() {
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
 
     _ringController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2500),
     )..repeat();
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.06).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     _ringAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _ringController, curve: Curves.easeOut),
+    );
+
+    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
   }
 
@@ -61,21 +74,37 @@ class _AgentAvatarState extends State<AgentAvatar>
   void dispose() {
     _pulseController.dispose();
     _ringController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   Color get _stateColor {
     switch (widget.agentState) {
       case 'listening':
-        return const Color(0xFF4ADE80); // green
+        return const Color(0xFF00D4AA); // neon mint
       case 'thinking':
-        return const Color(0xFF60A5FA); // blue
+        return const Color(0xFF60A5FA); // sky blue
       case 'speaking':
-        return const Color(0xFFA78BFA); // purple
+        return const Color(0xFFA78BFA); // lavender
       case 'blocked':
-        return const Color(0xFFF87171); // red
+        return const Color(0xFFFF6B6B); // coral red
       default:
-        return Colors.white24;
+        return const Color(0xFF7C5CFC).withValues(alpha: 0.3); // dim indigo
+    }
+  }
+
+  Color get _secondaryColor {
+    switch (widget.agentState) {
+      case 'listening':
+        return const Color(0xFF00B894);
+      case 'thinking':
+        return const Color(0xFF7C5CFC);
+      case 'speaking':
+        return const Color(0xFFFF6B9D);
+      case 'blocked':
+        return const Color(0xFFFF8E8E);
+      default:
+        return const Color(0xFF5B3FD4);
     }
   }
 
@@ -84,13 +113,28 @@ class _AgentAvatarState extends State<AgentAvatar>
       case 'listening':
         return 'Listening';
       case 'thinking':
-        return 'Thinking…';
+        return 'Processing…';
       case 'speaking':
         return 'Speaking';
       case 'blocked':
-        return 'Blocked 🚫';
+        return 'Blocked';
       default:
         return 'Connected';
+    }
+  }
+
+  IconData get _stateIcon {
+    switch (widget.agentState) {
+      case 'listening':
+        return Icons.hearing;
+      case 'thinking':
+        return Icons.auto_awesome;
+      case 'speaking':
+        return Icons.graphic_eq_rounded;
+      case 'blocked':
+        return Icons.block;
+      default:
+        return Icons.circle;
     }
   }
 
@@ -101,57 +145,98 @@ class _AgentAvatarState extends State<AgentAvatar>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── Avatar with animated rings ────────────────────────────────
+        // ── Avatar with layered glow aura ─────────────────────────────
         SizedBox(
-          width: widget.size + 40,
-          height: widget.size + 40,
+          width: widget.size + 50,
+          height: widget.size + 50,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Pulsing rings (only when active)
-              if (_isActive) ...[
+              // Layer 1: Outer ambient glow
+              if (_isActive)
                 AnimatedBuilder(
-                  animation: _ringAnimation,
-                  builder: (_, __) => _buildRing(
-                    scale: 1.0 + _ringAnimation.value * 0.3,
-                    opacity: (1.0 - _ringAnimation.value) * 0.4,
-                  ),
-                ),
-                AnimatedBuilder(
-                  animation: _ringAnimation,
-                  builder: (_, __) => _buildRing(
-                    scale: 1.0 + ((_ringAnimation.value + 0.5) % 1.0) * 0.3,
-                    opacity:
-                        (1.0 - ((_ringAnimation.value + 0.5) % 1.0)) * 0.25,
-                  ),
-                ),
-              ],
-
-              // Glow effect when speaking
-              if (widget.agentState == 'speaking')
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
+                  animation: _glowAnimation,
                   builder: (_, __) => Container(
-                    width: widget.size + 20,
-                    height: widget.size + 20,
+                    width: widget.size + 70,
+                    height: widget.size + 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: _stateColor
-                              .withValues(alpha: 0.4 * _pulseAnimation.value),
-                          blurRadius: 60,
+                          color: _stateColor.withValues(
+                              alpha: 0.15 * _glowAnimation.value),
+                          blurRadius: 80,
                           spreadRadius: 20,
+                        ),
+                        BoxShadow(
+                          color: _secondaryColor.withValues(
+                              alpha: 0.08 * _glowAnimation.value),
+                          blurRadius: 100,
+                          spreadRadius: 40,
                         ),
                       ],
                     ),
                   ),
                 ),
 
-              // Main avatar circle
+              // Layer 2: Expanding rings (3 staggered)
+              if (_isActive) ...[
+                AnimatedBuilder(
+                  animation: _ringAnimation,
+                  builder: (_, __) => _buildRing(
+                    scale: 1.0 + _ringAnimation.value * 0.35,
+                    opacity: (1.0 - _ringAnimation.value) * 0.3,
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: _ringAnimation,
+                  builder: (_, __) => _buildRing(
+                    scale:
+                        1.0 + ((_ringAnimation.value + 0.33) % 1.0) * 0.35,
+                    opacity:
+                        (1.0 - ((_ringAnimation.value + 0.33) % 1.0)) * 0.2,
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: _ringAnimation,
+                  builder: (_, __) => _buildRing(
+                    scale:
+                        1.0 + ((_ringAnimation.value + 0.66) % 1.0) * 0.35,
+                    opacity:
+                        (1.0 - ((_ringAnimation.value + 0.66) % 1.0)) * 0.15,
+                  ),
+                ),
+              ],
+
+              // Layer 3: Inner glow ring (speaking)
+              if (widget.agentState == 'speaking')
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (_, __) => Container(
+                    width: widget.size + 16,
+                    height: widget.size + 16,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _stateColor.withValues(
+                              alpha: 0.25 * _pulseAnimation.value),
+                          _secondaryColor.withValues(
+                              alpha: 0.15 * _pulseAnimation.value),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Layer 4: Main avatar circle
               AnimatedBuilder(
                 animation: _pulseAnimation,
                 builder: (_, child) => Transform.scale(
@@ -163,28 +248,41 @@ class _AgentAvatarState extends State<AgentAvatar>
                   height: widget.size,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.05),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF0D1527),
+                        const Color(0xFF111B30),
+                      ],
+                    ),
                     border: Border.all(
-                      color: _stateColor.withValues(alpha: 0.4),
-                      width: 2.5,
+                      color: _stateColor.withValues(alpha: 0.35),
+                      width: 2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
                       ),
+                      if (_isActive)
+                        BoxShadow(
+                          color: _stateColor.withValues(alpha: 0.2),
+                          blurRadius: 40,
+                        ),
                     ],
                   ),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      // Emoji
                       Text(
                         widget.emoji,
-                        style: TextStyle(fontSize: widget.size * 0.35),
+                        style: TextStyle(fontSize: widget.size * 0.32),
                       ),
-                      // Gradient overlay when speaking
-                      if (widget.agentState == 'speaking')
+                      // Gradient overlay when active
+                      if (_isActive)
                         Positioned.fill(
                           child: AnimatedBuilder(
                             animation: _pulseController,
@@ -197,7 +295,8 @@ class _AgentAvatarState extends State<AgentAvatar>
                                   colors: [
                                     Colors.transparent,
                                     _stateColor.withValues(
-                                        alpha: 0.3 * _pulseAnimation.value),
+                                        alpha:
+                                            0.2 * _pulseAnimation.value),
                                   ],
                                 ),
                               ),
@@ -212,54 +311,65 @@ class _AgentAvatarState extends State<AgentAvatar>
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
-        // ── State badge ───────────────────────────────────────────────
+        // ── State badge (pill) ────────────────────────────────────────
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            borderRadius: BorderRadius.circular(24),
+            color: _stateColor.withValues(alpha: 0.1),
+            border: Border.all(
+              color: _stateColor.withValues(alpha: 0.2),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Animated dot
               _AnimatedDot(color: _stateColor),
               const SizedBox(width: 6),
+              Icon(
+                _stateIcon,
+                size: 12,
+                color: _stateColor.withValues(alpha: 0.8),
+              ),
+              const SizedBox(width: 5),
               Text(
                 _stateLabel,
-                style: TextStyle(
+                style: GoogleFonts.outfit(
                   color: _stateColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
-        // ── Name ──────────────────────────────────────────────────────
+        // ── Name ─────────────────────────────────────────────────────
         Text(
           widget.personaName,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
             color: Colors.white,
+            letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Text(
           'AI Voice Agent',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.white.withValues(alpha: 0.4),
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            color: Colors.white.withValues(alpha: 0.3),
+            letterSpacing: 0.3,
           ),
         ),
       ],
+      ),
     );
   }
 
@@ -315,15 +425,19 @@ class _AnimatedDotState extends State<_AnimatedDot>
     return AnimatedBuilder(
       animation: _controller,
       builder: (_, __) => Container(
-        width: 6,
-        height: 6,
+        width: 7,
+        height: 7,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: widget.color.withValues(alpha: 0.5 + _controller.value * 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withValues(alpha: 0.4 * _controller.value),
+              blurRadius: 8,
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
-

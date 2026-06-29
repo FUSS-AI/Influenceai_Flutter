@@ -1,13 +1,14 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/voice_session.dart';
 import '../widgets/agent_avatar.dart';
 
-/// Voice call screen — mirrors Vue `SessionRoom.vue`.
+/// Immersive voice call screen.
 ///
-/// Shows the animated avatar, live transcript, and session controls (mic, end call).
-/// Receives session details and persona info via route arguments.
+/// The agent avatar is the full-screen centrepiece. The transcript floats as a
+/// translucent glass overlay at the bottom. Controls sit in a floating dock.
 class SessionScreen extends StatefulWidget {
   const SessionScreen({super.key});
 
@@ -26,6 +27,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
   bool _isLeaving = false;
   bool _didConnect = false;
+  bool _transcriptExpanded = true;
 
   @override
   void didChangeDependencies() {
@@ -95,13 +97,32 @@ class _SessionScreenState extends State<SessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0F),
+      backgroundColor: const Color(0xFF060B18),
       body: Stack(
         children: [
-          // ── Ambient glows ───────────────────────────────────────────
+          // ── Ambient mesh gradients ─────────────────────────────────
           Positioned(
-            top: -50,
-            left: MediaQuery.of(context).size.width * 0.2,
+            top: -100,
+            left: MediaQuery.of(context).size.width * 0.15,
+            child: Container(
+              width: 600,
+              height: 600,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF7C5CFC).withValues(alpha: 0.18),
+                    const Color(0xFF7C5CFC).withValues(alpha: 0.04),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.4, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -150,
+            right: -50,
             child: Container(
               width: 500,
               height: 500,
@@ -109,24 +130,7 @@ class _SessionScreenState extends State<SessionScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -80,
-            right: MediaQuery.of(context).size.width * 0.2,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF06B6D4).withValues(alpha: 0.1),
+                    const Color(0xFF00D4AA).withValues(alpha: 0.12),
                     Colors.transparent,
                   ],
                 ),
@@ -134,7 +138,7 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
           ),
 
-          // ── Main content ────────────────────────────────────────────
+          // ── Main content ──────────────────────────────────────────
           SafeArea(
             child: Column(
               children: [
@@ -143,38 +147,179 @@ class _SessionScreenState extends State<SessionScreen> {
                 // Connection error banner
                 if (_session.error != null) _buildErrorBanner(),
 
-                // Body — avatar + transcript
+                // Immersive body — avatar centred, transcript floating
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // On wide screens, side-by-side layout
-                      if (constraints.maxWidth > 700) {
-                        return Row(
-                          children: [
-                            // Left: Avatar + controls
-                            SizedBox(
-                              width: 360,
-                              child: _buildAvatarPanel(),
+                  child: Stack(
+                    children: [
+                      // ── Centred avatar ──────────────────────────────
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: _transcriptExpanded ? 260 : 60,
+                        child: Center(
+                          child: AgentAvatar(
+                            agentState: _session.agentState,
+                            personaName: _personaName,
+                            emoji: _personaEmoji,
+                            size: MediaQuery.of(context).size.width > 700
+                                ? 180
+                                : 130,
+                          ),
+                        ),
+                      ),
+
+                      // ── Floating transcript overlay ────────────────
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 8,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          height: _transcriptExpanded ? 220 : 44,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: BackdropFilter(
+                              filter:
+                                  ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D1527)
+                                      .withValues(alpha: 0.75),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.08),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    // Toolbar
+                                    GestureDetector(
+                                      onTap: () => setState(() =>
+                                          _transcriptExpanded =
+                                              !_transcriptExpanded),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 10),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.chat_bubble_outline,
+                                              size: 14,
+                                              color: const Color(0xFF7C5CFC)
+                                                  .withValues(alpha: 0.7),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Live Transcript',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.6),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            if (_session.transcript.isNotEmpty)
+                                              GestureDetector(
+                                                onTap: _session.clearTranscript,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    color: Colors.white.withValues(alpha: 0.05),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.close, size: 11, color: Colors.white.withValues(alpha: 0.3)),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Clear',
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 11,
+                                                          color: Colors.white.withValues(alpha: 0.3),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '${_session.transcript.length}',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11,
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            AnimatedRotation(
+                                              turns: _transcriptExpanded
+                                                  ? 0.5
+                                                  : 0.0,
+                                              duration: const Duration(
+                                                  milliseconds: 200),
+                                              child: Icon(
+                                                Icons.keyboard_arrow_up,
+                                                size: 18,
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Messages
+                                    if (_transcriptExpanded)
+                                      Expanded(
+                                        child:
+                                            _session.transcript.isEmpty
+                                                ? _buildEmptyTranscript()
+                                                : ListView.builder(
+                                                    controller:
+                                                        _scrollController,
+                                                    padding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                            horizontal: 14,
+                                                            vertical: 4),
+                                                    itemCount: _session
+                                                            .transcript
+                                                            .length +
+                                                        (_isThinkingOrSpeaking
+                                                            ? 1
+                                                            : 0),
+                                                    itemBuilder:
+                                                        (context, index) {
+                                                      if (index ==
+                                                          _session.transcript
+                                                              .length) {
+                                                        return _buildTypingIndicator();
+                                                      }
+                                                      return _buildMessageBubble(
+                                                          _session.transcript[
+                                                              index]);
+                                                    },
+                                                  ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            Container(
-                              width: 1,
-                              color: Colors.white.withValues(alpha: 0.05),
-                            ),
-                            // Right: Transcript
-                            Expanded(child: _buildTranscriptPanel()),
-                          ],
-                        );
-                      }
-                      // On narrow screens, stacked layout
-                      return Column(
-                        children: [
-                          _buildAvatarPanel(compact: true),
-                          Expanded(child: _buildTranscriptPanel()),
-                        ],
-                      );
-                    },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+
+                // ── Floating control dock ───────────────────────────
+                _buildControlDock(),
               ],
             ),
           ),
@@ -183,95 +328,126 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
+  bool get _isThinkingOrSpeaking =>
+      _session.agentState == 'thinking' || _session.agentState == 'speaking';
+
   // ── Header ──────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-      ),
-      child: Row(
-        children: [
-          // End session
-          GestureDetector(
-            onTap: _isLeaving ? null : _handleLeave,
-            child: Row(
-              children: [
-                Icon(Icons.arrow_back,
-                    size: 16,
-                    color: Colors.white.withValues(alpha: 0.5)),
-                const SizedBox(width: 6),
-                Text(
-                  'End Session',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
+    final stateInfo = _getStateInfo();
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.03),
+            border: Border(
+              bottom:
+                  BorderSide(color: Colors.white.withValues(alpha: 0.05)),
             ),
           ),
-          const Spacer(),
-
-          // Title + Live indicator
-          Column(
+          child: Row(
             children: [
-              Text(
-                _personaName,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF4ADE80),
+              // End session
+              GestureDetector(
+                onTap: _isLeaving ? null : _handleLeave,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withValues(alpha: 0.05),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_back_rounded,
+                          size: 14,
+                          color: Colors.white.withValues(alpha: 0.5)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'End',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+
+              // Title + Live indicator
+              Column(
+                children: [
                   Text(
-                    'Live',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.4),
+                    _personaName,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: stateInfo.$2,
+                          boxShadow: [
+                            BoxShadow(
+                              color: stateInfo.$2.withValues(alpha: 0.6),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        stateInfo.$1,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: stateInfo.$2.withValues(alpha: 0.8),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+              const Spacer(),
+
+              // Loading spinner when leaving
+              SizedBox(
+                width: 70,
+                child: _isLeaving
+                    ? const Align(
+                        alignment: Alignment.centerRight,
+                        child: SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white24,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
-          const Spacer(),
-
-          // Loading spinner when leaving
-          SizedBox(
-            width: 80,
-            child: _isLeaving
-                ? const Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white24,
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -281,16 +457,17 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget _buildErrorBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.red.withValues(alpha: 0.1),
+      color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
       child: Row(
         children: [
           const Icon(Icons.warning_amber_rounded,
-              size: 14, color: Colors.redAccent),
+              size: 14, color: Color(0xFFFF6B6B)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _session.error!,
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.redAccent),
+              style: GoogleFonts.outfit(
+                  fontSize: 12, color: const Color(0xFFFF6B6B)),
             ),
           ),
         ],
@@ -298,199 +475,129 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  // ── Avatar panel ────────────────────────────────────────────────────────
+  // ── Floating control dock ───────────────────────────────────────────────
 
-  Widget _buildAvatarPanel({bool compact = false}) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: compact ? 16 : 32,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Animated avatar
-          AgentAvatar(
-            agentState: _session.agentState,
-            personaName: _personaName,
-            emoji: _personaEmoji,
-            size: compact ? 120 : 180,
-          ),
-
-          SizedBox(height: compact ? 16 : 24),
-
-          // Controls: mic toggle + end call
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Mic button
-              _buildControlButton(
-                icon: _session.micEnabled ? Icons.mic : Icons.mic_off,
-                label: _session.micEnabled ? 'Mute' : 'Unmute',
-                color: _session.micEnabled
-                    ? const Color(0xFF8B5CF6)
-                    : Colors.white24,
-                onTap: _session.toggleMic,
+  Widget _buildControlDock() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24, top: 8),
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D1527).withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Mic button
+                  _buildDockButton(
+                    icon: _session.micEnabled ? Icons.mic : Icons.mic_off,
+                    isActive: _session.micEnabled,
+                    color: const Color(0xFF7C5CFC),
+                    onTap: _session.toggleMic,
+                  ),
+                  const SizedBox(width: 8),
 
-              // End call button
-              _buildControlButton(
-                icon: Icons.call_end,
-                label: 'End',
-                color: Colors.redAccent,
-                onTap: _handleLeave,
-                isDestructive: true,
+                  // End call button
+                  _buildDockButton(
+                    icon: Icons.call_end_rounded,
+                    isActive: true,
+                    color: const Color(0xFFFF6B6B),
+                    onTap: _handleLeave,
+                    isDestructive: true,
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Transcript toggle
+                  _buildDockButton(
+                    icon: Icons.subtitles_rounded,
+                    isActive: _transcriptExpanded,
+                    color: const Color(0xFF00D4AA),
+                    onTap: () => setState(
+                        () => _transcriptExpanded = !_transcriptExpanded),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildControlButton({
+  Widget _buildDockButton({
     required IconData icon,
-    required String label,
+    required bool isActive,
     required Color color,
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.2),
-              border: Border.all(color: color.withValues(alpha: 0.4)),
-            ),
-            child: Icon(icon, size: 20, color: color),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isActive || isDestructive
+              ? color.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.05),
+          border: Border.all(
+            color: isActive || isDestructive
+                ? color.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
-          ),
-        ],
+          boxShadow: isActive || isDestructive
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: isActive || isDestructive
+              ? color
+              : Colors.white.withValues(alpha: 0.4),
+        ),
       ),
     );
   }
 
-  // ── Transcript panel ────────────────────────────────────────────────────
-
-  Widget _buildTranscriptPanel() {
-    return Column(
-      children: [
-        // Toolbar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.chat_bubble_outline,
-                  size: 14,
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.7)),
-              const SizedBox(width: 8),
-              Text(
-                'Live Transcript',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-              const Spacer(),
-              if (_session.transcript.isNotEmpty)
-                GestureDetector(
-                  onTap: _session.clearTranscript,
-                  child: Row(
-                    children: [
-                      Icon(Icons.close,
-                          size: 11,
-                          color: Colors.white.withValues(alpha: 0.25)),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Clear',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.25),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-
-        // Message list
-        Expanded(
-          child: _session.transcript.isEmpty
-              ? _buildEmptyTranscript()
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _session.transcript.length +
-                      (_isThinkingOrSpeaking ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _session.transcript.length) {
-                      return _buildTypingIndicator();
-                    }
-                    return _buildMessageBubble(_session.transcript[index]);
-                  },
-                ),
-        ),
-
-        // Footer status bar
-        _buildFooterBar(),
-      ],
-    );
-  }
-
-  bool get _isThinkingOrSpeaking =>
-      _session.agentState == 'thinking' || _session.agentState == 'speaking';
+  // ── Transcript helpers ──────────────────────────────────────────────────
 
   Widget _buildEmptyTranscript() {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-            child: Icon(Icons.mic,
-                size: 24, color: Colors.white.withValues(alpha: 0.2)),
-          ),
-          const SizedBox(height: 12),
+          Icon(Icons.graphic_eq_rounded,
+              size: 24, color: Colors.white.withValues(alpha: 0.15)),
+          const SizedBox(height: 8),
           Text(
-            'Conversation will appear here',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.3),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Start speaking to see live transcripts',
-            style: GoogleFonts.inter(
-              fontSize: 11,
+            'Start speaking to see transcripts',
+            style: GoogleFonts.outfit(
+              fontSize: 12,
               color: Colors.white.withValues(alpha: 0.2),
             ),
           ),
@@ -502,90 +609,90 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget _buildMessageBubble(transcript) {
     final isUser = transcript.speaker == 'user';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         mainAxisAlignment:
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            // Agent avatar
             Container(
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                border: Border.all(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.15),
               ),
               child: Center(
                 child: Text(_personaEmoji,
-                    style: const TextStyle(fontSize: 12)),
+                    style: const TextStyle(fontSize: 11)),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
           ],
 
-          // Bubble
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.65),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  maxWidth: MediaQuery.of(context).size.width * 0.6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isUser
-                    ? const Color(0xFF06B6D4).withValues(alpha: 0.1)
-                    : transcript.isBackchannel
-                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.05)
-                        : const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                    ? const Color(0xFF00D4AA).withValues(alpha: 0.1)
+                    : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft:
-                      isUser ? const Radius.circular(16) : const Radius.circular(4),
-                  bottomRight:
-                      isUser ? const Radius.circular(4) : const Radius.circular(16),
+                  topLeft: const Radius.circular(14),
+                  topRight: const Radius.circular(14),
+                  bottomLeft: isUser
+                      ? const Radius.circular(14)
+                      : const Radius.circular(4),
+                  bottomRight: isUser
+                      ? const Radius.circular(4)
+                      : const Radius.circular(14),
                 ),
                 border: Border.all(
                   color: isUser
-                      ? const Color(0xFF06B6D4).withValues(alpha: 0.2)
-                      : const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                      ? const Color(0xFF00D4AA).withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.06),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Speaker label + timestamp
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         isUser ? 'You' : _personaName,
-                        style: GoogleFonts.inter(
+                        style: GoogleFonts.outfit(
                           fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.5),
+                          fontWeight: FontWeight.w700,
+                          color: isUser
+                              ? const Color(0xFF00D4AA)
+                                  .withValues(alpha: 0.7)
+                              : const Color(0xFF7C5CFC)
+                                  .withValues(alpha: 0.7),
                           letterSpacing: 0.8,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         transcript.timestamp,
-                        style: GoogleFonts.inter(
+                        style: GoogleFonts.outfit(
                           fontSize: 9,
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     transcript.text,
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.outfit(
                       fontSize: 13,
                       color: Colors.white.withValues(
-                          alpha: transcript.isFinal ? 0.9 : 0.6),
+                          alpha: transcript.isFinal ? 0.85 : 0.5),
                       fontStyle: transcript.isBackchannel
                           ? FontStyle.italic
                           : FontStyle.normal,
@@ -597,19 +704,17 @@ class _SessionScreenState extends State<SessionScreen> {
           ),
 
           if (isUser) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Container(
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF06B6D4).withValues(alpha: 0.1),
-                border: Border.all(
-                    color: const Color(0xFF06B6D4).withValues(alpha: 0.3)),
+                color: const Color(0xFF00D4AA).withValues(alpha: 0.15),
               ),
               child: Icon(Icons.mic,
-                  size: 13,
-                  color: const Color(0xFF06B6D4).withValues(alpha: 0.7)),
+                  size: 12,
+                  color: const Color(0xFF00D4AA).withValues(alpha: 0.7)),
             ),
           ],
         ],
@@ -619,35 +724,35 @@ class _SessionScreenState extends State<SessionScreen> {
 
   Widget _buildTypingIndicator() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.05),
-              border:
-                  Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
-            child:
-                Center(child: Text(_personaEmoji, style: const TextStyle(fontSize: 12))),
+            child: Center(
+                child: Text(_personaEmoji,
+                    style: const TextStyle(fontSize: 11))),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(14),
+                topRight: Radius.circular(14),
                 bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
+                bottomRight: Radius.circular(14),
               ),
               border: Border.all(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+                  color: Colors.white.withValues(alpha: 0.06)),
             ),
             child: const _BouncingDots(),
           ),
@@ -656,73 +761,25 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  Widget _buildFooterBar() {
-    final stateInfo = _getStateInfo();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '${_session.transcript.length} message${_session.transcript.length != 1 ? 's' : ''}',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.3),
-            ),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: stateInfo.$2,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                stateInfo.$1,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: stateInfo.$2,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   (String, Color) _getStateInfo() {
-    // Priority: connection states first, then agent states
     switch (_session.connectionState) {
       case 'connecting':
-        return ('Connecting…', const Color(0xFFFACC15));
+        return ('Connecting…', const Color(0xFFFFD166));
       case 'reconnecting':
-        return ('Reconnecting…', const Color(0xFFFACC15));
+        return ('Reconnecting…', const Color(0xFFFFD166));
       case 'failed':
-        return ('Failed', Colors.redAccent);
+        return ('Failed', const Color(0xFFFF6B6B));
     }
 
     switch (_session.agentState) {
       case 'listening':
-        return ('Listening', const Color(0xFF4ADE80));
+        return ('Listening', const Color(0xFF00D4AA));
       case 'thinking':
         return ('Thinking…', const Color(0xFF60A5FA));
       case 'speaking':
         return ('Speaking', const Color(0xFFA78BFA));
       case 'blocked':
-        return ('Blocked', Colors.redAccent);
+        return ('Blocked', const Color(0xFFFF6B6B));
       default:
         return ('Connected', Colors.white54);
     }
@@ -781,8 +838,8 @@ class _BouncingDotsState extends State<_BouncingDots>
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF8B5CF6)
-                  .withValues(alpha: 0.4 + _controllers[i].value * 0.4),
+              color: const Color(0xFF7C5CFC)
+                  .withValues(alpha: 0.3 + _controllers[i].value * 0.5),
             ),
           ),
         );

@@ -11,7 +11,7 @@ const String _agentStateKey = 'lk.agent.state';
 
 /// Manages a LiveKit voice session with an AI agent.
 ///
-/// Mirrors the Vue `useVoiceSession.js` composable. Wraps a LiveKit [Room],
+/// Wraps a LiveKit [Room],
 /// exposes reactive state via [ChangeNotifier], and handles:
 ///   - Connection lifecycle with state tracking
 ///   - Agent-state updates via participant attributes
@@ -210,7 +210,7 @@ class VoiceSession extends ChangeNotifier {
   }
 
   // ── Echo detection ──────────────────────────────────────────────────────
-  // Mirrors the algorithm in the Vue SessionRoom.jsx exactly.
+  // Detects when the user's STT output echoes the agent's recent speech.
 
   String _normaliseEchoText(String text) {
     return text

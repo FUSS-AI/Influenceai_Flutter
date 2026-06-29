@@ -35,6 +35,11 @@ class VoiceSession extends ChangeNotifier {
   // Plain list — only referenced imperatively, never rendered.
   final List<_EchoPhrase> _recentAgentPhrases = [];
 
+  // ── Duration tracking ───────────────────────────────────────────────────
+  Timer? _timer;
+  int _durationSeconds = 0;
+  String _duration = '00:00';
+
   // ── Getters ─────────────────────────────────────────────────────────────
 
   /// Current connection state:
@@ -50,6 +55,9 @@ class VoiceSession extends ChangeNotifier {
 
   /// Last error message, or null.
   String? get error => _error;
+
+  /// Formatted connection duration (e.g., '02:15').
+  String get duration => _duration;
 
   /// Live conversation transcript (unmodifiable view).
   List<TranscriptEntry> get transcript => List.unmodifiable(_transcript);
@@ -79,12 +87,14 @@ class VoiceSession extends ChangeNotifier {
     _listener.on<RoomConnectedEvent>((event) {
       _connectionState = 'connected';
       _error = null;
+      _startTimer();
       notifyListeners();
     });
     _listener.on<RoomDisconnectedEvent>((event) {
       _connectionState = 'disconnected';
       _agentState = 'idle';
       _micEnabled = false;
+      _stopTimer();
       notifyListeners();
     });
     _listener.on<RoomReconnectingEvent>((event) {
@@ -251,6 +261,26 @@ class VoiceSession extends ChangeNotifier {
     });
   }
 
+  // ── Timer logic ─────────────────────────────────────────────────────────
+
+  void _startTimer() {
+    _durationSeconds = 0;
+    _duration = '00:00';
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _durationSeconds++;
+      final m = (_durationSeconds ~/ 60).toString().padLeft(2, '0');
+      final s = (_durationSeconds % 60).toString().padLeft(2, '0');
+      _duration = '$m:$s';
+      notifyListeners();
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   // ── Public API ──────────────────────────────────────────────────────────
 
   /// Connect to a LiveKit room.
@@ -282,7 +312,19 @@ class VoiceSession extends ChangeNotifier {
     _connectionState = 'disconnected';
     _agentState = 'idle';
     _micEnabled = false;
+    _stopTimer();
     notifyListeners();
+  }
+
+  /// Send an interrupt signal to halt AI generation instantly.
+  Future<void> interrupt() async {
+    if (_connectionState != 'connected') return;
+    try {
+      final payload = utf8.encode(jsonEncode({'type': 'interrupt'}));
+      await _room.localParticipant?.publishData(payload, reliable: true);
+    } catch (e) {
+      debugPrint('[VoiceSession] interrupt failed: $e');
+    }
   }
 
   /// Toggle the local microphone on/off.
@@ -320,6 +362,7 @@ class VoiceSession extends ChangeNotifier {
   @override
   void dispose() {
     _listener.dispose();
+    _stopTimer();
     _room.disconnect();
     _room.dispose();
     super.dispose();

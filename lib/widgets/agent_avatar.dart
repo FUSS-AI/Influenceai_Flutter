@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 /// Animated avatar widget with pulsing rings based on agent state.

@@ -11,7 +11,7 @@ class AppConfig {
   /// External team → soulchat-ai → InfluenceAI (internal, not directly accessible).
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8004/client/v1/influencer',
+    defaultValue: 'http://localhost:8005/client/v1/influencer',
   );
 
   /// Your platform API key (issued by the platform team).

@@ -308,6 +308,20 @@ class VoiceSession extends ChangeNotifier {
 
   /// Disconnect from the LiveKit room.
   Future<void> disconnect() async {
+    if (_connectionState == 'connected') {
+      try {
+        final payload = utf8.encode(jsonEncode({
+          'type': 'end_session',
+          'reason': 'user_actively_ended',
+        }));
+        await _room.localParticipant?.publishData(payload, reliable: true);
+        debugPrint('[VoiceSession] end_session signal published successfully!');
+        // Give the WebRTC data channel 300ms to flush the packet before disconnecting
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        debugPrint('[VoiceSession] end_session signal failed: $e');
+      }
+    }
     await _room.disconnect();
     _connectionState = 'disconnected';
     _agentState = 'idle';

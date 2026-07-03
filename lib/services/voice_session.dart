@@ -94,6 +94,7 @@ class VoiceSession extends ChangeNotifier {
       _connectionState = 'disconnected';
       _agentState = 'idle';
       _micEnabled = false;
+      _isInterrupted = false;
       _stopTimer();
       notifyListeners();
     });
@@ -326,6 +327,7 @@ class VoiceSession extends ChangeNotifier {
     _connectionState = 'disconnected';
     _agentState = 'idle';
     _micEnabled = false;
+    _isInterrupted = false;
     _stopTimer();
     notifyListeners();
   }

@@ -330,14 +330,34 @@ class VoiceSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isInterrupted = false;
+
+  /// Whether the AI is currently interrupted and waiting to be resumed.
+  bool get isInterrupted => _isInterrupted;
+
   /// Send an interrupt signal to halt AI generation instantly.
   Future<void> interrupt() async {
     if (_connectionState != 'connected') return;
     try {
       final payload = utf8.encode(jsonEncode({'type': 'interrupt'}));
       await _room.localParticipant?.publishData(payload, reliable: true);
+      _isInterrupted = true;
+      notifyListeners();
     } catch (e) {
       debugPrint('[VoiceSession] interrupt failed: $e');
+    }
+  }
+
+  /// Send a resume signal to un-mute the AI generation.
+  Future<void> resume() async {
+    if (_connectionState != 'connected') return;
+    try {
+      final payload = utf8.encode(jsonEncode({'type': 'resume'}));
+      await _room.localParticipant?.publishData(payload, reliable: true);
+      _isInterrupted = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[VoiceSession] resume failed: $e');
     }
   }
 

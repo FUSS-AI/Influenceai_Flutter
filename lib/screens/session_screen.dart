@@ -533,13 +533,24 @@ class _SessionScreenState extends State<SessionScreen> {
                   ),
                   const SizedBox(width: 8),
 
-                  // Interrupt button (only visible when agent is speaking)
-                  if (_session.agentState == 'speaking') ...[
+                  // Interrupt button (only visible when agent is speaking and not interrupted)
+                  if (_session.agentState == 'speaking' && !_session.isInterrupted) ...[
                     _buildDockButton(
                       icon: Icons.stop_rounded,
                       isActive: true,
                       color: const Color(0xFFFFD166), // Warning yellow/orange
                       onTap: _session.interrupt,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Resume button (only visible when interrupted)
+                  if (_session.isInterrupted) ...[
+                    _buildDockButton(
+                      icon: Icons.play_arrow_rounded,
+                      isActive: true,
+                      color: const Color(0xFF00D4AA), // Green
+                      onTap: _session.resume,
                     ),
                     const SizedBox(width: 8),
                   ],
